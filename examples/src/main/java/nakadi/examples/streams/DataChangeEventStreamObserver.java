@@ -38,6 +38,7 @@ public class DataChangeEventStreamObserver
 
   @Override public void onNext(StreamBatchRecord<DataChangeEvent<Map<String, Object>>> record) {
     final StreamOffsetObserver offsetObserver = record.streamOffsetObserver();
+    final StreamDLQ dlq = record.streamDLQ();
     final StreamBatch<DataChangeEvent<Map<String, Object>>> batch = record.streamBatch();
     final StreamCursorContext cursor = record.streamCursorContext();
 
@@ -47,14 +48,30 @@ public class DataChangeEventStreamObserver
       logger.info("partition: {} keepalive", cursor.cursor().partition());
     } else {
       final List<DataChangeEvent<Map<String, Object>>> events = batch.events();
+      final List<DataChangeEvent<Map<String, Object>>> failedEvents = new LinkedList<>();
+
       for (DataChangeEvent<Map<String, Object>> event : events) {
-        int hashCode = event.hashCode();
-        logger.info("{} event ------------- ", hashCode);
-        logger.info("{} metadata: {} ", hashCode, event.metadata());
-        logger.info("{} op: {} ", hashCode, event.op());
-        logger.info("{} dataType: {} ", hashCode, event.dataType());
-        logger.info("{} data: {} ", hashCode, event.data());
+        if (Random.nextBoolean()) {
+            failedEvents.add(event);
+        } else {
+            int hashCode = event.hashCode();
+            logger.info("{} event ------------- ", hashCode);
+            logger.info("{} metadata: {} ", hashCode, event.metadata());
+            logger.info("{} op: {} ", hashCode, event.op());
+            logger.info("{} dataType: {} ", hashCode, event.dataType());
+            logger.info("{} data: {} ", hashCode, event.data());
+        }
       }
+
+      if (failedEvents) {
+            try {
+                dlq.submit(failedEvents);
+            } catch (Exception e) {
+                LOG.warn("failed to send events to Nakadi DLQ", e);
+                // can not commit otherwise will lose the events
+                throw new DLQException();
+            }
+        }
     }
 
     offsetObserver.onNext(record.streamCursorContext());
