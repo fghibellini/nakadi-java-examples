@@ -51,7 +51,7 @@ public class DataChangeEventStreamObserver
       final List<DataChangeEvent<Map<String, Object>>> failedEvents = new LinkedList<>();
 
       for (DataChangeEvent<Map<String, Object>> event : events) {
-        if (Random.nextBoolean()) {
+        if (Random.nextBoolean()) { // this simulates a failure to process an event
             failedEvents.add(event);
         } else {
             int hashCode = event.hashCode();
